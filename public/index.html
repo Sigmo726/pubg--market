@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>PUBG Market — аккаунты</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header>
+  <h1>PUBG Market</h1>
+  <nav>
+    <a href="/">Каталог</a>
+  </nav>
+</header>
+
+<section id="filters">
+  <select id="f-region">
+    <option value="">Все регионы</option>
+    <option value="EU">EU</option>
+    <option value="NA">NA</option>
+    <option value="AS">AS</option>
+    <option value="CIS">CIS</option>
+  </select>
+  <select id="f-platform">
+    <option value="">Все платформы</option>
+    <option value="steam">Steam</option>
+    <option value="mobile">Mobile</option>
+    <option value="xbox">Xbox</option>
+    <option value="psn">PSN</option>
+  </select>
+  <select id="f-rank">
+    <option value="">Любой ранг</option>
+    <option value="bronze">Bronze</option>
+    <option value="silver">Silver</option>
+    <option value="gold">Gold</option>
+    <option value="platinum">Platinum</option>
+    <option value="diamond">Diamond</option>
+    <option value="crown">Crown</option>
+    <option value="ace">Ace</option>
+    <option value="conqueror">Conqueror</option>
+  </select>
+  <input id="f-min" type="number" placeholder="от, $" />
+  <input id="f-max" type="number" placeholder="до, $" />
+  <select id="f-sort">
+    <option value="newest">Новые</option>
+    <option value="price_asc">Дешевле</option>
+    <option value="price_desc">Дороже</option>
+    <option value="rating">По рейтингу</option>
+  </select>
+  <button id="apply">Применить</button>
+</section>
+
+<main id="grid"></main>
+
+<script>
+const grid = document.getElementById('grid');
+
+async function load() {
+  const q = new URLSearchParams({
+    region:   document.getElementById('f-region').value,
+    platform: document.getElementById('f-platform').value,
+    rank:     document.getElementById('f-rank').value,
+    min:      (document.getElementById('f-min').value || 0) * 100,
+    max:      document.getElementById('f-max').value ?
+              document.getElementById('f-max').value * 100 : '',
+    sort:     document.getElementById('f-sort').value
+  });
+  const r = await fetch('/api/accounts?' + q);
+  const items = await r.json();
+  grid.innerHTML = items.map(renderCard).join('') || '<p>Пусто.</p>';
+}
+
+function renderCard(l) {
+  const usd = (l.price_cents / 100).toFixed(2);
+  const shots = JSON.parse(l.screenshots || '[]');
+  return `
+    <article class="card" data-id="${l.id}">
+      <div class="thumb">${shots[0]
+        ? `<img src="${shots[0]}" alt="">`
+        : '<div class="noimg">no preview</div>'}</div>
+      <h3>${escapeHtml(l.title)}</h3>
+      <ul class="specs">
+        <li>${l.region} · ${l.platform}</li>
+        <li>Ранг: <b>${l.rank_tier}</b></li>
+        <li>Ур. ${l.level} · скинов ${l.skins_count} · мификов ${l.mythic_items}</li>
+        <li>K/D ${l.kd}</li>
+      </ul>
+      <div class="price">$${usd}</div>
+      <div class="seller">
+        @${l.seller} · ★${(l.seller_rating || 0).toFixed(1)} · ${l.seller_sales} сделок
+      </div>
+      <button onclick="buy(${l.id})">Купить</button>
+    </article>`;
+}
+
+async function buy(id) {
+  const r = await fetch('/api/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ listing_id: id })
+  });
+  const j = await r.json();
+  if (j.error) return alert(j.error);
+  alert('Заказ ' + j.order_id + ' в эскроу. Деньги уйдут продавцу после подтверждения.');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+document.getElementById('apply').onclick = load;
+load();
+</script>
+</body>
+</html>
